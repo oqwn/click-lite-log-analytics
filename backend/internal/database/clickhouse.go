@@ -2,10 +2,13 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/rs/zerolog/log"
 
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
@@ -13,34 +16,31 @@ import (
 )
 
 type DB struct {
-	conn driver.Conn
+	baseURL string
+	client  *http.Client
 }
 
 func New(cfg config.DatabaseConfig) (*DB, error) {
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)},
-		Auth: clickhouse.Auth{
-			Database: cfg.Database,
-			Username: cfg.Username,
-			Password: cfg.Password,
-		},
-		Settings: clickhouse.Settings{
-			"max_execution_time": 60,
-		},
-		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to ClickHouse: %w", err)
+	// Use HTTP connection to ClickHouse on port 8123
+	port := "8123" // Always use HTTP port
+	baseURL := fmt.Sprintf("http://%s:%s", cfg.Host, port)
+	
+	log.Info().Str("url", baseURL).Str("database", cfg.Database).Str("username", cfg.Username).Msg("Connecting to ClickHouse")
+	
+	client := &http.Client{
+		Timeout: 30 * time.Second,
 	}
-
+	
+	db := &DB{
+		baseURL: baseURL,
+		client:  client,
+	}
+	
 	// Test connection
-	if err := conn.Ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ping ClickHouse: %w", err)
+	ctx := context.Background()
+	if err := db.ping(ctx); err != nil {
+		return nil, fmt.Errorf("failed to test ClickHouse connection: %w", err)
 	}
-
-	db := &DB{conn: conn}
 	
 	// Initialize schema
 	if err := db.InitSchema(); err != nil {
@@ -51,21 +51,30 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	return db, nil
 }
 
+func (db *DB) ping(ctx context.Context) error {
+	query := "SELECT 1"
+	resp, err := db.client.Post(db.baseURL, "text/plain", strings.NewReader(query))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ClickHouse error: %s", string(body))
+	}
+	
+	return nil
+}
+
 func (db *DB) Close() error {
-	return db.conn.Close()
+	// HTTP client doesn't need explicit closing
+	return nil
 }
 
 func (db *DB) InitSchema() error {
-	ctx := context.Background()
-	
-	// Create database if not exists
-	query := fmt.Sprintf(`CREATE DATABASE IF NOT EXISTS %s`, db.conn.Stats().Addr[0])
-	if err := db.conn.Exec(ctx, query); err != nil {
-		log.Debug().Err(err).Msg("Database might already exist")
-	}
-
 	// Create logs table
-	query = `
+	query := `
 	CREATE TABLE IF NOT EXISTS logs (
 		id UUID DEFAULT generateUUIDv4(),
 		timestamp DateTime64(3),
@@ -86,7 +95,7 @@ func (db *DB) InitSchema() error {
 	SETTINGS index_granularity = 8192
 	`
 	
-	if err := db.conn.Exec(ctx, query); err != nil {
+	if err := db.exec(query); err != nil {
 		return fmt.Errorf("failed to create logs table: %w", err)
 	}
 
@@ -94,56 +103,82 @@ func (db *DB) InitSchema() error {
 	return nil
 }
 
-func (db *DB) InsertLog(ctx context.Context, log *models.Log) error {
-	query := `
-		INSERT INTO logs (timestamp, level, message, service, trace_id, span_id, attributes)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`
+func (db *DB) exec(query string) error {
+	resp, err := db.client.Post(db.baseURL, "text/plain", strings.NewReader(query))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 	
-	// Convert attributes to map[string]string for ClickHouse
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ClickHouse error: %s", string(body))
+	}
+	
+	return nil
+}
+
+func (db *DB) InsertLog(ctx context.Context, logEntry *models.Log) error {
+	// Convert attributes to JSON format for ClickHouse
 	attrs := make(map[string]string)
-	for k, v := range log.Attributes {
+	for k, v := range logEntry.Attributes {
 		attrs[k] = fmt.Sprintf("%v", v)
 	}
 	
-	return db.conn.Exec(ctx, query, 
-		log.Timestamp, 
-		log.Level, 
-		log.Message, 
-		log.Service, 
-		log.TraceID, 
-		log.SpanID, 
-		attrs,
+	// Build INSERT query with VALUES format
+	query := fmt.Sprintf(`
+		INSERT INTO logs (timestamp, level, message, service, trace_id, span_id, attributes)
+		VALUES ('%s', '%s', '%s', '%s', '%s', '%s', %s)
+	`,
+		logEntry.Timestamp.Format("2006-01-02 15:04:05.000"),
+		strings.ReplaceAll(logEntry.Level, "'", "\\'"),
+		strings.ReplaceAll(logEntry.Message, "'", "\\'"),
+		strings.ReplaceAll(logEntry.Service, "'", "\\'"),
+		strings.ReplaceAll(logEntry.TraceID, "'", "\\'"),
+		strings.ReplaceAll(logEntry.SpanID, "'", "\\'"),
+		formatMapForClickHouse(attrs),
 	)
+	
+	return db.exec(query)
+}
+
+func formatMapForClickHouse(m map[string]string) string {
+	if len(m) == 0 {
+		return "map()"
+	}
+	
+	var pairs []string
+	for k, v := range m {
+		pairs = append(pairs, fmt.Sprintf("'%s', '%s'", 
+			strings.ReplaceAll(k, "'", "\\'"),
+			strings.ReplaceAll(v, "'", "\\'")))
+	}
+	
+	return fmt.Sprintf("map(%s)", strings.Join(pairs, ", "))
 }
 
 func (db *DB) QueryLogs(ctx context.Context, query *models.LogQuery) ([]models.Log, error) {
 	// Build query
-	q := `
+	q := fmt.Sprintf(`
 		SELECT id, timestamp, level, message, service, trace_id, span_id, attributes
 		FROM logs
-		WHERE timestamp >= ? AND timestamp <= ?
-	`
-	args := []interface{}{query.StartTime, query.EndTime}
+		WHERE timestamp >= '%s' AND timestamp <= '%s'
+	`, query.StartTime.Format("2006-01-02 15:04:05"), query.EndTime.Format("2006-01-02 15:04:05"))
 
 	if query.Service != "" {
-		q += " AND service = ?"
-		args = append(args, query.Service)
+		q += fmt.Sprintf(" AND service = '%s'", strings.ReplaceAll(query.Service, "'", "\\'"))
 	}
 
 	if query.Level != "" {
-		q += " AND level = ?"
-		args = append(args, query.Level)
+		q += fmt.Sprintf(" AND level = '%s'", strings.ReplaceAll(query.Level, "'", "\\'"))
 	}
 
 	if query.TraceID != "" {
-		q += " AND trace_id = ?"
-		args = append(args, query.TraceID)
+		q += fmt.Sprintf(" AND trace_id = '%s'", strings.ReplaceAll(query.TraceID, "'", "\\'"))
 	}
 
 	if query.Search != "" {
-		q += " AND position(lower(message), lower(?)) > 0"
-		args = append(args, query.Search)
+		q += fmt.Sprintf(" AND position(lower(message), lower('%s')) > 0", strings.ReplaceAll(query.Search, "'", "\\'"))
 	}
 
 	q += " ORDER BY timestamp DESC"
@@ -155,34 +190,58 @@ func (db *DB) QueryLogs(ctx context.Context, query *models.LogQuery) ([]models.L
 		}
 	}
 
-	rows, err := db.conn.Query(ctx, q, args...)
+	// Add FORMAT JSONEachRow for easier parsing
+	q += " FORMAT JSONEachRow"
+
+	resp, err := db.client.Post(db.baseURL, "text/plain", strings.NewReader(q))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
-	defer rows.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ClickHouse error: %s", string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
 
 	var logs []models.Log
-	for rows.Next() {
-		var log models.Log
-		var attrs map[string]string
+	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+	
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
 		
-		if err := rows.Scan(
-			&log.ID,
-			&log.Timestamp,
-			&log.Level,
-			&log.Message,
-			&log.Service,
-			&log.TraceID,
-			&log.SpanID,
-			&attrs,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+		var row map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			continue // Skip invalid rows
 		}
 
-		// Convert string map to interface{} map
+		log := models.Log{
+			ID:      row["id"].(string),
+			Level:   row["level"].(string),
+			Message: row["message"].(string),
+			Service: row["service"].(string),
+			TraceID: row["trace_id"].(string),
+			SpanID:  row["span_id"].(string),
+		}
+
+		// Parse timestamp
+		if timestampStr, ok := row["timestamp"].(string); ok {
+			if timestamp, err := time.Parse("2006-01-02 15:04:05.000", timestampStr); err == nil {
+				log.Timestamp = timestamp
+			}
+		}
+
+		// Parse attributes
 		log.Attributes = make(map[string]interface{})
-		for k, v := range attrs {
-			log.Attributes[k] = v
+		if attrs, ok := row["attributes"].(map[string]interface{}); ok {
+			log.Attributes = attrs
 		}
 
 		logs = append(logs, log)
@@ -192,5 +251,5 @@ func (db *DB) QueryLogs(ctx context.Context, query *models.LogQuery) ([]models.L
 }
 
 func (db *DB) Health(ctx context.Context) error {
-	return db.conn.Ping(ctx)
+	return db.ping(ctx)
 }

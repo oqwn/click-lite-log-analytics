@@ -96,10 +96,10 @@ func (h *Hub) BroadcastLog(log *models.Log) {
 }
 
 // BroadcastToClients sends a message to specific clients based on their filters
-func (h *Hub) BroadcastToClients(log *models.Log) {
+func (h *Hub) BroadcastToClients(logEntry *models.Log) {
 	message := models.WebSocketMessage{
 		Type: "log",
-		Data: log,
+		Data: logEntry,
 	}
 
 	msgBytes, err := json.Marshal(message)
@@ -112,7 +112,7 @@ func (h *Hub) BroadcastToClients(log *models.Log) {
 
 	for client := range h.clients {
 		// Check if log matches client's filters
-		if client.MatchesFilters(log) && !client.isPaused {
+		if client.MatchesFilters(logEntry) && !client.isPaused {
 			select {
 			case client.send <- msgBytes:
 			default:
