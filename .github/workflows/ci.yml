@@ -27,8 +27,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
           
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -49,17 +53,30 @@ jobs:
           golangci-lint run --timeout=5m
           goimports -l -w .
           
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+            
       - name: Install frontend dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
         
       - name: Run ESLint
         working-directory: ./frontend
-        run: npm run lint
+        run: pnpm run lint
         
       - name: Run Prettier check
         working-directory: ./frontend
-        run: npm run format:check
+        run: pnpm run format:check
 
   # Test Job
   test:
@@ -88,8 +105,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
           
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -115,13 +136,26 @@ jobs:
           flags: backend
           token: ${{ secrets.CODECOV_TOKEN }}
           
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+            
       - name: Install frontend dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
         
       - name: Run frontend tests
         working-directory: ./frontend
-        run: npm test -- --coverage --watchAll=false
+        run: pnpm test -- --coverage --watchAll=false
         
       - name: Upload frontend coverage
         uses: codecov/codecov-action@v4
@@ -147,8 +181,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
           
       - name: Build Go binary
         working-directory: ./backend
@@ -159,7 +197,7 @@ jobs:
         working-directory: ./frontend
         run: |
           npm ci
-          npm run build
+          pnpm run build
           
       - name: Upload Go binary
         uses: actions/upload-artifact@v4
@@ -191,9 +229,9 @@ jobs:
         with:
           args: './backend/...'
           
-      - name: Run npm audit
+      - name: Run pnpm audit
         working-directory: ./frontend
-        run: npm audit --production
+        run: pnpm audit --production
 
   # Docker Build Job
   docker:

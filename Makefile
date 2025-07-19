@@ -71,32 +71,32 @@ backend-run:
 ## frontend-install: Install frontend dependencies
 frontend-install:
 	@echo "${GREEN}Installing frontend dependencies...${NC}"
-	cd $(FRONTEND_DIR) && npm ci
+	cd $(FRONTEND_DIR) && pnpm install
 
 ## frontend-build: Build frontend
 frontend-build:
 	@echo "${GREEN}Building frontend...${NC}"
-	cd $(FRONTEND_DIR) && npm run build
+	cd $(FRONTEND_DIR) && pnpm run build
 
 ## frontend-test: Run frontend tests
 frontend-test:
 	@echo "${GREEN}Running frontend tests...${NC}"
-	cd $(FRONTEND_DIR) && npm test -- --coverage --watchAll=false
+	cd $(FRONTEND_DIR) && pnpm test -- --coverage --watchAll=false
 
 ## frontend-lint: Lint frontend code
 frontend-lint:
 	@echo "${GREEN}Linting frontend...${NC}"
-	cd $(FRONTEND_DIR) && npm run lint
+	cd $(FRONTEND_DIR) && pnpm run lint
 
 ## frontend-fmt: Format frontend code
 frontend-fmt:
 	@echo "${GREEN}Formatting frontend code...${NC}"
-	cd $(FRONTEND_DIR) && npm run format
+	cd $(FRONTEND_DIR) && pnpm run format
 
 ## frontend-run: Run frontend locally
 frontend-run:
 	@echo "${GREEN}Running frontend...${NC}"
-	cd $(FRONTEND_DIR) && npm start
+	cd $(FRONTEND_DIR) && pnpm run dev
 
 ## Docker
 
@@ -149,7 +149,7 @@ security-scan:
 	@which trivy > /dev/null || (echo "${RED}trivy not installed${NC}" && exit 1)
 	trivy fs --severity HIGH,CRITICAL .
 	cd $(BACKEND_DIR) && gosec ./...
-	cd $(FRONTEND_DIR) && npm audit --production
+	cd $(FRONTEND_DIR) && pnpm audit --production
 
 ## Utilities
 
@@ -173,8 +173,10 @@ setup:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/cosmtrek/air@latest
+	@echo "Installing pnpm..."
+	npm install -g pnpm
 	@echo "Installing frontend dependencies..."
-	cd $(FRONTEND_DIR) && npm ci
+	cd $(FRONTEND_DIR) && pnpm install
 	@echo "${GREEN}Setup complete!${NC}"
 
 ## logs: Show logs from docker-compose

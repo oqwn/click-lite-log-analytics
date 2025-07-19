@@ -24,7 +24,7 @@ services:
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
-    command: npm start
+    command: pnpm run dev --host
 
 volumes:
   go_modules:
