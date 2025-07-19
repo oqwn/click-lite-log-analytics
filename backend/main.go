@@ -17,6 +17,7 @@ import (
 
 	"github.com/your-username/click-lite-log-analytics/backend/internal/api"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/dashboard"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/ingestion"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
@@ -54,6 +55,9 @@ func main() {
 	// Initialize WebSocket hub for real-time log tailing
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
+
+	// Initialize dashboard service (singleton for in-memory storage)
+	dashboardService := dashboard.NewService(db)
 
 	// Initialize log tailer
 	ctx, cancel := context.WithCancel(context.Background())
@@ -124,6 +128,29 @@ func main() {
 			r.Post("/saved/{id}/execute", api.ExecuteSavedQuery(db))
 			r.Get("/saved/{id}/execute", api.ExecuteSavedQuery(db))
 		})
+
+		// Query Builder endpoints
+		r.Route("/query-builder", func(r chi.Router) {
+			r.Get("/fields", api.GetAvailableFields(db))
+			r.Post("/generate-sql", api.GenerateSQL(db))
+			r.Post("/execute", api.ExecuteQueryBuilder(db))
+			r.Post("/validate", api.ValidateQueryBuilder(db))
+		})
+
+		// Dashboard endpoints
+		r.Route("/dashboards", func(r chi.Router) {
+			r.Get("/", api.ListDashboards(dashboardService))
+			r.Post("/", api.CreateDashboard(dashboardService))
+			r.Get("/{id}", api.GetDashboard(dashboardService))
+			r.Put("/{id}", api.UpdateDashboard(dashboardService))
+			r.Delete("/{id}", api.DeleteDashboard(dashboardService))
+			r.Post("/{id}/share", api.ShareDashboard(dashboardService))
+			r.Get("/{dashboard_id}/widgets/{widget_id}/query", api.ExecuteWidgetQuery(dashboardService))
+			r.Get("/{dashboard_id}/widgets/{widget_id}/data", api.GetWidgetData(dashboardService))
+		})
+
+		// Shared dashboard endpoints
+		r.Get("/shared/{token}", api.GetSharedDashboard(dashboardService))
 		
 		// Ingestion endpoints
 		r.Route("/ingest", func(r chi.Router) {

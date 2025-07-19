@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -86,8 +85,7 @@ func (lt *LogTailer) fetchNewLogs(ctx context.Context, since time.Time) ([]*mode
 			level,
 			service,
 			message,
-			trace_id,
-			raw_log
+			trace_id
 		FROM logs
 		WHERE timestamp > '%s'
 		ORDER BY timestamp ASC
@@ -145,21 +143,9 @@ func (lt *LogTailer) fetchNewLogs(ctx context.Context, since time.Time) ([]*mode
 			entry.TraceID = traceID
 		}
 
-		// Parse raw_log for additional attributes
-		if rawLog, ok := row["raw_log"].(string); ok && rawLog != "" {
-			var fields map[string]interface{}
-			if err := json.Unmarshal([]byte(rawLog), &fields); err == nil {
-				// Remove fields we already have as top-level
-				delete(fields, "timestamp")
-				delete(fields, "level")
-				delete(fields, "service")
-				delete(fields, "message")
-				delete(fields, "trace_id")
-				
-				if len(fields) > 0 {
-					entry.Attributes = fields
-				}
-			}
+		// Set empty attributes if none exist
+		if entry.Attributes == nil {
+			entry.Attributes = make(map[string]interface{})
 		}
 
 		logs = append(logs, entry)
