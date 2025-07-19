@@ -30,7 +30,7 @@ export const useWebSocket = ({
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeout = useRef<number | null>(null);
   const reconnectAttempts = useRef(0);
 
   const connect = useCallback(() => {
@@ -74,18 +74,19 @@ export const useWebSocket = ({
             handleStatusMessage(message);
           }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          // Failed to parse WebSocket message
         }
       };
     } catch (error) {
-      console.error('Failed to connect to WebSocket:', error);
+      // Failed to connect to WebSocket
     }
   }, [url, onConnect, onDisconnect, onError, onMessage]);
 
   const handleStatusMessage = (message: WebSocketMessage) => {
-    if (message.data?.status === 'paused') {
+    const data = message.data as { status?: string };
+    if (data?.status === 'paused') {
       setIsPaused(true);
-    } else if (message.data?.status === 'resumed') {
+    } else if (data?.status === 'resumed') {
       setIsPaused(false);
     }
   };

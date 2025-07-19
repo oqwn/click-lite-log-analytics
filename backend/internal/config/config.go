@@ -29,7 +29,7 @@ type JWTConfig struct {
 func Load() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port: getEnv("PORT", "8080"),
+			Port: getEnv("PORT", "20002"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("CLICKHOUSE_HOST", "localhost"),

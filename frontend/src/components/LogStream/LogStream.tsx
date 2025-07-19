@@ -8,7 +8,6 @@ import {
   TextField,
   InputAdornment,
   Tooltip,
-  CircularProgress,
   Alert,
 } from '@mui/material';
 import {
@@ -20,8 +19,7 @@ import {
   Refresh,
   FiberManualRecord,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { Log, LogFilter, LOG_LEVEL_COLORS } from '../../types/log';
+import { Log, LogFilter } from '../../types/log';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import LogEntry from './LogEntry';
 import FilterDialog from './FilterDialog';

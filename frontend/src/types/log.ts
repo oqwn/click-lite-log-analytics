@@ -6,7 +6,7 @@ export interface Log {
   service: string;
   trace_id?: string;
   span_id?: string;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, string | number | boolean>;
 }
 
 export interface LogFilter {
@@ -18,7 +18,7 @@ export interface LogFilter {
 export interface WebSocketMessage {
   type: string;
   action?: string;
-  data?: any;
+  data?: unknown;
   filters?: LogFilter[];
 }
 

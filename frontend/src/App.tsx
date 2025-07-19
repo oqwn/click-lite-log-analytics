@@ -1,4 +1,3 @@
-import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Container, AppBar, Toolbar, Typography } from '@mui/material';
@@ -18,7 +17,7 @@ const theme = createTheme({
 
 function App() {
   // Get WebSocket URL from environment or use default
-  const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:8080/api/v1/ws';
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:20002/api/v1/ws';
 
   return (
     <ThemeProvider theme={theme}>
