@@ -1,0 +1,162 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '20'
+
+jobs:
+  # Create Release
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+  # Build and Release Binaries
+  build-release:
+    name: Build and Release
+    needs: release
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Get OS and arch
+        id: os_arch
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            echo "goos=linux" >> $GITHUB_OUTPUT
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            echo "goos=darwin" >> $GITHUB_OUTPUT
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            echo "goos=windows" >> $GITHUB_OUTPUT
+          fi
+          echo "goarch=${{ matrix.arch }}" >> $GITHUB_OUTPUT
+        shell: bash
+        
+      - name: Build binary
+        working-directory: ./backend
+        run: |
+          GOOS=${{ steps.os_arch.outputs.goos }} GOARCH=${{ steps.os_arch.outputs.goarch }} \
+          go build -ldflags="-s -w -X main.version=${{ needs.release.outputs.version }}" \
+          -o click-lite-${{ steps.os_arch.outputs.goos }}-${{ matrix.arch }}${{ runner.os == 'Windows' && '.exe' || '' }}
+        shell: bash
+        
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.release.outputs.release_url }}
+          asset_path: ./backend/click-lite-${{ steps.os_arch.outputs.goos }}-${{ matrix.arch }}${{ runner.os == 'Windows' && '.exe' || '' }}
+          asset_name: click-lite-${{ steps.os_arch.outputs.goos }}-${{ matrix.arch }}${{ runner.os == 'Windows' && '.exe' || '' }}
+          asset_content_type: application/octet-stream
+
+  # Build and Push Docker Images
+  docker-release:
+    name: Docker Release
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Build and push backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/click-lite-backend:${{ needs.release.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/click-lite-backend:latest
+            ghcr.io/${{ github.repository_owner }}/click-lite-backend:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/click-lite-backend:latest
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
+            
+      - name: Build and push frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/click-lite-frontend:${{ needs.release.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/click-lite-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/click-lite-frontend:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/click-lite-frontend:latest
+
+  # Create Helm Chart
+  helm-release:
+    name: Helm Chart Release
+    needs: [release, docker-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Package Helm chart
+        run: |
+          helm package ./helm/click-lite --version ${{ needs.release.outputs.version }}
+          
+      - name: Upload Helm chart
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.release.outputs.release_url }}
+          asset_path: ./click-lite-${{ needs.release.outputs.version }}.tgz
+          asset_name: click-lite-${{ needs.release.outputs.version }}.tgz
+          asset_content_type: application/gzip

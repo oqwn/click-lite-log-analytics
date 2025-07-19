@@ -1,0 +1,30 @@
+version: '3.8'
+
+# Development overrides
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+      - go_modules:/go/pkg/mod
+    environment:
+      - GO_ENV=development
+      - LOG_LEVEL=debug
+    command: air -c .air.toml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    command: npm start
+
+volumes:
+  go_modules:

@@ -1,0 +1,40 @@
+# Git files
+.git
+.gitignore
+
+# Go files
+*.test
+*.out
+coverage.html
+vendor/
+
+# IDE files
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+click-lite
+click-lite-*
+
+# Documentation
+*.md
+docs/
+
+# Test data
+testdata/
+test/
+
+# CI/CD
+.github/
+Makefile
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
