@@ -1,7 +1,12 @@
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Container, AppBar, Toolbar, Typography } from '@mui/material';
-import LogStream from './components/LogStream';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MainLayout } from './components/Layout/MainLayout';
+import { HomePage } from './pages/HomePage';
+import { QueryBuilder } from './components/QueryBuilder';
+import { DashboardList, DashboardView } from './components/Dashboard';
+import { LogStreamEnhanced } from './components/LogStream/LogStreamEnhanced';
 
 const theme = createTheme({
   palette: {
@@ -15,27 +20,35 @@ const theme = createTheme({
   },
 });
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 function App() {
-  // Get WebSocket URL from environment or use default
   const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:20002/api/v1/ws';
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <AppBar position="static">
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Click-Lite Log Analytics
-            </Typography>
-          </Toolbar>
-        </AppBar>
-        
-        <Container maxWidth={false} sx={{ flexGrow: 1, py: 3, display: 'flex' }}>
-          <LogStream wsUrl={wsUrl} />
-        </Container>
-      </Box>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="logs" element={<LogStreamEnhanced wsUrl={wsUrl} />} />
+              <Route path="query-builder" element={<QueryBuilder />} />
+              <Route path="dashboards" element={<DashboardList />} />
+              <Route path="dashboard/:id" element={<DashboardView />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
