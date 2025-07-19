@@ -51,9 +51,15 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize WebSocket hub
+	// Initialize WebSocket hub for real-time log tailing
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
+
+	// Initialize log tailer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logTailer := websocket.NewLogTailer(db, wsHub)
+	go logTailer.Start(ctx)
 
 	// Initialize batch processor for ingestion
 	batchProcessor := ingestion.NewBatchProcessor(db, 500, 5*time.Second)
@@ -105,6 +111,7 @@ func main() {
 		r.Get("/logs", api.QueryLogs(db))
 		r.Get("/storage/stats", api.StorageStats(db))
 		r.HandleFunc("/ws", websocket.HandleWebSocket(wsHub))
+		r.Get("/ws/stats", api.WebSocketStats(wsHub))
 		
 		// SQL Query endpoints
 		r.Route("/query", func(r chi.Router) {

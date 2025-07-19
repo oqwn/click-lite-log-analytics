@@ -13,6 +13,7 @@ import (
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/models"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/parsing"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
 )
 
 // HealthCheck returns the health status of the service
@@ -276,5 +277,18 @@ func StorageStats(db *database.DB) http.HandlerFunc {
 		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// WebSocketStats returns WebSocket connection statistics
+func WebSocketStats(hub *websocket.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		stats := map[string]interface{}{
+			"active_clients": hub.GetConnectedClients(),
+			"timestamp":      time.Now(),
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(stats)
 	}
 }
