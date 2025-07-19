@@ -13,6 +13,7 @@ import (
 
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/models"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/query"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/storage"
 )
 
@@ -20,6 +21,8 @@ type DB struct {
 	baseURL        string
 	client         *http.Client
 	storageManager *storage.Manager
+	queryEngine    *query.Engine
+	database       string
 }
 
 func New(cfg config.DatabaseConfig) (*DB, error) {
@@ -40,10 +43,18 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	storageConfig := storage.DefaultConfig()
 	storageManager := storage.NewManager(storageConfig, adapter)
 	
+	// Create query adapter
+	queryAdapter := NewQueryAdapter(baseURL, cfg.Database)
+	
+	// Create query engine
+	queryEngine := query.NewEngine(queryAdapter)
+	
 	db := &DB{
 		baseURL:        baseURL,
 		client:         client,
 		storageManager: storageManager,
+		queryEngine:    queryEngine,
+		database:       cfg.Database,
 	}
 	
 	// Test connection
@@ -60,7 +71,7 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	// Start automated cleanup routines
 	storageManager.StartCleanupRoutine()
 	
-	log.Info().Msg("Connected to ClickHouse with optimized storage")
+	log.Info().Msg("Connected to ClickHouse with optimized storage and SQL support")
 	return db, nil
 }
 
@@ -278,4 +289,14 @@ func (db *DB) GetStorageStats() (*storage.StorageStats, error) {
 		return nil, fmt.Errorf("storage manager not initialized")
 	}
 	return db.storageManager.GetStorageStats()
+}
+
+// GetQueryEngine returns the query engine
+func (db *DB) GetQueryEngine() *query.Engine {
+	return db.queryEngine
+}
+
+// ExecuteQuery executes a SQL query
+func (db *DB) ExecuteQuery(ctx context.Context, req *query.QueryRequest) (*query.QueryResponse, error) {
+	return db.queryEngine.Execute(ctx, req)
 }

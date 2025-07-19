@@ -106,6 +106,18 @@ func main() {
 		r.Get("/storage/stats", api.StorageStats(db))
 		r.HandleFunc("/ws", websocket.HandleWebSocket(wsHub))
 		
+		// SQL Query endpoints
+		r.Route("/query", func(r chi.Router) {
+			r.Post("/execute", api.ExecuteQuery(db))
+			r.Get("/saved", api.ListQueries(db))
+			r.Post("/saved", api.SaveQuery(db))
+			r.Get("/saved/{id}", api.GetQuery(db))
+			r.Put("/saved/{id}", api.UpdateQuery(db))
+			r.Delete("/saved/{id}", api.DeleteQuery(db))
+			r.Post("/saved/{id}/execute", api.ExecuteSavedQuery(db))
+			r.Get("/saved/{id}/execute", api.ExecuteSavedQuery(db))
+		})
+		
 		// Ingestion endpoints
 		r.Route("/ingest", func(r chi.Router) {
 			r.Get("/health", httpHandler.HealthCheck())

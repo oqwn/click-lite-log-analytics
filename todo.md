@@ -30,16 +30,16 @@
 ## Phase 2: Query Engine
 
 ### SQL Support
-- [ ] Integrate ClickHouse client
-- [ ] Implement SQL query interface
-- [ ] Add query validation
-- [ ] Implement query optimization
+- [x] Integrate ClickHouse client
+- [x] Implement SQL query interface
+- [x] Add query validation
+- [x] Implement query optimization
 
 ### Saved Queries
-- [ ] Create saved query storage mechanism
-- [ ] Implement CRUD operations for saved queries
-- [ ] Add query parameterization
-- [ ] Create query templates
+- [x] Create saved query storage mechanism
+- [x] Implement CRUD operations for saved queries
+- [x] Add query parameterization
+- [x] Create query templates
 
 ## Phase 3: User Interface
 
