@@ -103,6 +103,7 @@ func main() {
 		r.Get("/health", api.HealthCheck(db))
 		r.Post("/logs", api.IngestLogs(db))
 		r.Get("/logs", api.QueryLogs(db))
+		r.Get("/storage/stats", api.StorageStats(db))
 		r.HandleFunc("/ws", websocket.HandleWebSocket(wsHub))
 		
 		// Ingestion endpoints

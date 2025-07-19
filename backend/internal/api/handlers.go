@@ -157,3 +157,22 @@ func QueryLogs(db *database.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(response)
 	}
 }
+// StorageStats returns detailed storage statistics
+func StorageStats(db *database.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		stats, err := db.GetStorageStats()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to get storage statistics")
+			http.Error(w, "Failed to get storage statistics", http.StatusInternalServerError)
+			return
+		}
+		
+		response := map[string]interface{}{
+			"storage_stats": stats,
+			"timestamp":     time.Now().UTC(),
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}

@@ -13,13 +13,13 @@
 - [x] Create retry logic for failed deliveries
 
 ### Storage Layer
-- [ ] Design and implement daily table partitioning
-- [ ] Implement data compression
-  - [ ] Choose compression algorithm (e.g., LZ4, ZSTD)
-  - [ ] Add compression/decompression logic
-- [ ] Implement TTL (Time To Live) mechanism
-  - [ ] Create automated cleanup jobs
-  - [ ] Configure retention policies
+- [x] Design and implement daily table partitioning
+- [x] Implement data compression
+  - [x] Choose compression algorithm (ZSTD)
+  - [x] Add compression/decompression logic
+- [x] Implement TTL (Time To Live) mechanism
+  - [x] Create automated cleanup jobs
+  - [x] Configure retention policies
 
 ### Data Parsing
 - [ ] Implement JSON parser for structured logs

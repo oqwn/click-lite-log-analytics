@@ -13,11 +13,13 @@ import (
 
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/models"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/storage"
 )
 
 type DB struct {
-	baseURL string
-	client  *http.Client
+	baseURL        string
+	client         *http.Client
+	storageManager *storage.Manager
 }
 
 func New(cfg config.DatabaseConfig) (*DB, error) {
@@ -31,9 +33,17 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		Timeout: 30 * time.Second,
 	}
 	
+	// Create ClickHouse adapter for storage manager
+	adapter := storage.NewClickHouseAdapter(baseURL)
+	
+	// Initialize storage manager with optimized configuration
+	storageConfig := storage.DefaultConfig()
+	storageManager := storage.NewManager(storageConfig, adapter)
+	
 	db := &DB{
-		baseURL: baseURL,
-		client:  client,
+		baseURL:        baseURL,
+		client:         client,
+		storageManager: storageManager,
 	}
 	
 	// Test connection
@@ -42,12 +52,15 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		return nil, fmt.Errorf("failed to test ClickHouse connection: %w", err)
 	}
 	
-	// Initialize schema
-	if err := db.InitSchema(); err != nil {
-		return nil, fmt.Errorf("failed to initialize schema: %w", err)
+	// Initialize optimized schema with partitioning, compression, and TTL
+	if err := storageManager.InitializeSchema(); err != nil {
+		return nil, fmt.Errorf("failed to initialize optimized schema: %w", err)
 	}
-
-	log.Info().Msg("Connected to ClickHouse")
+	
+	// Start automated cleanup routines
+	storageManager.StartCleanupRoutine()
+	
+	log.Info().Msg("Connected to ClickHouse with optimized storage")
 	return db, nil
 }
 
@@ -68,6 +81,11 @@ func (db *DB) ping(ctx context.Context) error {
 }
 
 func (db *DB) Close() error {
+	// Stop storage manager cleanup routines
+	if db.storageManager != nil {
+		db.storageManager.StopCleanupRoutine()
+	}
+	
 	// HTTP client doesn't need explicit closing
 	return nil
 }
@@ -252,4 +270,12 @@ func (db *DB) QueryLogs(ctx context.Context, query *models.LogQuery) ([]models.L
 
 func (db *DB) Health(ctx context.Context) error {
 	return db.ping(ctx)
+}
+
+// GetStorageStats returns detailed storage statistics
+func (db *DB) GetStorageStats() (*storage.StorageStats, error) {
+	if db.storageManager == nil {
+		return nil, fmt.Errorf("storage manager not initialized")
+	}
+	return db.storageManager.GetStorageStats()
 }
