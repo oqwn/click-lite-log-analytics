@@ -73,3 +73,5 @@ docker/volumes/
 
 # Air live reload
 /backend/tmp/
+
+CLAUDE.md
