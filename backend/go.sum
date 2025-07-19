@@ -1,0 +1,2 @@
+# This file will be populated when running go mod download
+# It contains the cryptographic checksums of the dependencies
