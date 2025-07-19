@@ -18,6 +18,7 @@ import (
 	"github.com/your-username/click-lite-log-analytics/backend/internal/api"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/ingestion"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
 )
 
@@ -54,6 +55,29 @@ func main() {
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 
+	// Initialize batch processor for ingestion
+	batchProcessor := ingestion.NewBatchProcessor(db, 500, 5*time.Second)
+	defer batchProcessor.Stop()
+
+	// Initialize ingestion handlers
+	httpHandler := ingestion.NewHTTPHandler(batchProcessor, wsHub)
+	
+	// Start TCP server
+	tcpServer := ingestion.NewTCPServer(":20003", batchProcessor, wsHub)
+	if err := tcpServer.Start(); err != nil {
+		log.Error().Err(err).Msg("Failed to start TCP server")
+	} else {
+		defer tcpServer.Stop()
+	}
+	
+	// Start Syslog server
+	syslogServer := ingestion.NewSyslogServer(":20004", batchProcessor, wsHub)
+	if err := syslogServer.Start(); err != nil {
+		log.Error().Err(err).Msg("Failed to start Syslog server")
+	} else {
+		defer syslogServer.Stop()
+	}
+
 	// Setup routes
 	r := chi.NewRouter()
 
@@ -80,6 +104,13 @@ func main() {
 		r.Post("/logs", api.IngestLogs(db))
 		r.Get("/logs", api.QueryLogs(db))
 		r.HandleFunc("/ws", websocket.HandleWebSocket(wsHub))
+		
+		// Ingestion endpoints
+		r.Route("/ingest", func(r chi.Router) {
+			r.Get("/health", httpHandler.HealthCheck())
+			r.Post("/logs", httpHandler.IngestLogs())
+			r.Post("/bulk", httpHandler.BulkIngestLogs())
+		})
 	})
 
 	// Start server

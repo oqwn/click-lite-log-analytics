@@ -3,14 +3,14 @@
 ## Phase 1: Core Infrastructure
 
 ### Log Ingestion
-- [ ] Implement multi-protocol receiver
-  - [ ] HTTP receiver endpoint
-  - [ ] TCP receiver endpoint
-  - [ ] Syslog receiver endpoint
-- [ ] Develop lightweight Go agent for log collection
-- [ ] Implement batch write mechanism
-- [ ] Add at-least-once delivery semantics
-- [ ] Create retry logic for failed deliveries
+- [x] Implement multi-protocol receiver
+  - [x] HTTP receiver endpoint
+  - [x] TCP receiver endpoint
+  - [x] Syslog receiver endpoint
+- [x] Develop lightweight Go agent for log collection
+- [x] Implement batch write mechanism
+- [x] Add at-least-once delivery semantics
+- [x] Create retry logic for failed deliveries
 
 ### Storage Layer
 - [ ] Design and implement daily table partitioning
