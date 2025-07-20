@@ -106,6 +106,7 @@ export const MainLayout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
+          ml: { sm: `${drawerWidth}px` },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           height: '100vh',
           display: 'flex',
