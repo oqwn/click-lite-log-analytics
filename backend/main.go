@@ -20,6 +20,7 @@ import (
 	"github.com/your-username/click-lite-log-analytics/backend/internal/dashboard"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/ingestion"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/monitoring"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
 )
 
@@ -59,9 +60,39 @@ func main() {
 	// Initialize dashboard service (singleton for in-memory storage)
 	dashboardService := dashboard.NewService(db)
 
+	// Initialize monitoring
+	metrics := monitoring.NewMetricsCollector()
+	metrics.SetDescription("total_logs_ingested", "Total number of logs ingested")
+	metrics.SetDescription("total_queries_executed", "Total number of queries executed")
+	metrics.SetDescription("query_duration_ms", "Query execution duration in milliseconds")
+	metrics.SetDescription("storage_size_bytes", "Storage size in bytes")
+	
+	healthMonitor := monitoring.NewHealthMonitor(version)
+	healthMonitor.RegisterChecker(monitoring.NewStorageHealthChecker("./data"))
+	healthMonitor.RegisterChecker(monitoring.NewAPIHealthChecker("http://localhost:"+cfg.Server.Port, 5*time.Second))
+	healthMonitor.RegisterChecker(monitoring.NewIngestionHealthChecker(metrics))
+	healthMonitor.RegisterChecker(monitoring.NewQueryEngineHealthChecker(metrics))
+	
+	alertManager := monitoring.NewAlertManager(metrics)
+	alertManager.AddListener(monitoring.NewLogAlertListener(log.Logger))
+	
 	// Initialize log tailer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	
+	// Start alert checking
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				alertManager.CheckAlerts()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 	logTailer := websocket.NewLogTailer(db, wsHub)
 	go logTailer.Start(ctx)
 
@@ -70,7 +101,7 @@ func main() {
 	defer batchProcessor.Stop()
 
 	// Initialize ingestion handlers
-	httpHandler := ingestion.NewHTTPHandler(batchProcessor, wsHub)
+	httpHandler := ingestion.NewHTTPHandlerWithMetrics(batchProcessor, wsHub, metrics)
 	
 	// Start TCP server
 	tcpServer := ingestion.NewTCPServer(":20003", batchProcessor, wsHub)
@@ -157,6 +188,16 @@ func main() {
 			r.Get("/health", httpHandler.HealthCheck())
 			r.Post("/logs", httpHandler.IngestLogs())
 			r.Post("/bulk", httpHandler.BulkIngestLogs())
+		})
+		
+		// Monitoring endpoints
+		r.Route("/monitoring", func(r chi.Router) {
+			r.Get("/health", healthMonitor.HTTPHandler())
+			r.Get("/health/live", healthMonitor.LivenessHandler())
+			r.Get("/health/ready", healthMonitor.ReadinessHandler())
+			r.Get("/metrics", api.GetMetrics(metrics))
+			r.Get("/alerts", api.GetAlerts(alertManager))
+			r.Get("/alerts/active", api.GetActiveAlerts(alertManager))
 		})
 	})
 

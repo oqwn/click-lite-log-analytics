@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage';
 import { QueryBuilder } from './components/QueryBuilder';
 import { DashboardList, DashboardView } from './components/Dashboard';
 import { LogStreamEnhanced } from './components/LogStream/LogStreamEnhanced';
+import { MonitoringPage } from './pages/MonitoringPage';
 
 const theme = createTheme({
   palette: {
@@ -44,6 +45,7 @@ function App() {
               <Route path="query-builder" element={<QueryBuilder />} />
               <Route path="dashboards" element={<DashboardList />} />
               <Route path="dashboard/:id" element={<DashboardView />} />
+              <Route path="monitoring" element={<MonitoringPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
