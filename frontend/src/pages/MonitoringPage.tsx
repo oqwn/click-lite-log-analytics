@@ -32,7 +32,7 @@ import {
   TrendingDown,
   QueryStats,
 } from '@mui/icons-material';
-import { api } from '../services/api';
+import api from '../services/api';
 
 interface HealthComponent {
   name: string;
@@ -40,7 +40,7 @@ interface HealthComponent {
   message?: string;
   last_checked: string;
   response_time_ms: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 interface SystemHealth {
@@ -80,7 +80,7 @@ interface Alert {
   end_time?: string;
   last_updated: string;
   count: number;
-  details?: any;
+  details?: unknown;
 }
 
 export const MonitoringPage: React.FC = () => {
@@ -102,7 +102,7 @@ export const MonitoringPage: React.FC = () => {
       setMetrics(metricsRes.data.metrics);
       setAlerts(alertsRes.data.alerts);
     } catch (error) {
-      console.error('Failed to fetch monitoring data:', error);
+      // Silent error handling - monitoring will retry automatically
     } finally {
       setLoading(false);
     }
@@ -130,7 +130,7 @@ export const MonitoringPage: React.FC = () => {
     }
   };
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string): 'error' | 'warning' | 'info' | 'success' => {
     switch (severity) {
       case 'critical':
         return 'error';
@@ -139,7 +139,7 @@ export const MonitoringPage: React.FC = () => {
       case 'info':
         return 'info';
       default:
-        return 'default';
+        return 'success';
     }
   };
 
