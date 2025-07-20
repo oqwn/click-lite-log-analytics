@@ -3,6 +3,7 @@
 ## Phase 1: Core Infrastructure
 
 ### Log Ingestion
+
 - [x] Implement multi-protocol receiver
   - [x] HTTP receiver endpoint
   - [x] TCP receiver endpoint
@@ -13,6 +14,7 @@
 - [x] Create retry logic for failed deliveries
 
 ### Storage Layer
+
 - [x] Design and implement daily table partitioning
 - [x] Implement data compression
   - [x] Choose compression algorithm (ZSTD)
@@ -22,6 +24,7 @@
   - [x] Configure retention policies
 
 ### Data Parsing
+
 - [x] Implement JSON parser for structured logs
 - [x] Implement regex parser for unstructured logs
 - [x] Create configurable parsing rules
@@ -30,12 +33,14 @@
 ## Phase 2: Query Engine
 
 ### SQL Support
+
 - [x] Integrate ClickHouse client
 - [x] Implement SQL query interface
 - [x] Add query validation
 - [x] Implement query optimization
 
 ### Saved Queries
+
 - [x] Create saved query storage mechanism
 - [x] Implement CRUD operations for saved queries
 - [x] Add query parameterization
@@ -44,6 +49,7 @@
 ## Phase 3: User Interface
 
 ### Real-time Tail UI
+
 - [x] Implement WebSocket server
 - [x] Create real-time log streaming
 - [x] Add filtering capabilities
@@ -51,6 +57,7 @@
 - [x] Enhanced UI with search, filters, and export functionality
 
 ### Query Builder
+
 - [x] Design visual query builder interface
 - [x] Implement field selection
 - [x] Add filter conditions UI
@@ -60,6 +67,7 @@
 - [x] Query export functionality
 
 ### Dashboards
+
 - [x] Create dashboard management system
 - [x] Implement drag-and-drop widget placement (Backend APIs)
 - [x] Create chart components (Backend data generation)
@@ -77,6 +85,7 @@
 - [ ] Drag-and-drop widget positioning (React DnD implementation)
 
 ### Frontend Architecture
+
 - [x] React Router setup with main layout
 - [x] Material-UI theme and components
 - [x] API service layer with axios
@@ -89,6 +98,7 @@
 ## Phase 4: Monitoring & Observability ✅
 
 ### System Monitoring
+
 - [x] Implement health check endpoints
 - [x] Add metrics collection
   - [x] Ingestion rate metrics
@@ -97,30 +107,36 @@
 - [x] Create alerting system
 - [x] Add system dashboard
 
-## Phase 5: Security & Access Control
+### Prometheus Integration ✅
 
-### RBAC Implementation
-- [ ] Design role-based access control schema
-- [ ] Implement user authentication
-- [ ] Create role management system
-- [ ] Add permission checks to all endpoints
-- [ ] Implement audit logging
+- [x] Add Prometheus-compatible metrics endpoint (/metrics)
+- [x] Export metrics in Prometheus format
+  - [x] Counter metrics (total logs, queries, etc.)
+  - [x] Gauge metrics (current rates, memory usage, etc.)
+  - [x] Histogram metrics (query latencies, ingestion durations)
+  - [x] Summary metrics (quantiles)
+- [x] Add metric labels and cardinality management
+- [x] Create Grafana dashboard templates
+- [x] Document Prometheus scraping configuration
 
 ## Phase 6: Advanced Features
 
 ### Trace ID Correlation
+
 - [ ] Implement trace ID extraction
 - [ ] Create trace correlation logic
 - [ ] Add distributed tracing support
 - [ ] Build trace visualization
 
 ### Error Detection
+
 - [ ] Implement error pattern detection
 - [ ] Create error rate monitoring
 - [ ] Add anomaly detection
 - [ ] Build error dashboard
 
 ### Data Export
+
 - [ ] Implement CSV export functionality
 - [ ] Add Excel export support
 - [ ] Create scheduled export jobs
@@ -129,12 +145,14 @@
 ## Phase 7: Performance & Optimization
 
 ### Performance Tuning
+
 - [ ] Optimize query performance
 - [ ] Implement caching layer
 - [ ] Add query result pagination
 - [ ] Optimize storage layout
 
 ### Scalability
+
 - [ ] Implement horizontal scaling
 - [ ] Add load balancing
 - [ ] Create data sharding strategy
@@ -143,12 +161,14 @@
 ## Phase 8: Documentation & Testing
 
 ### Documentation
+
 - [ ] Write API documentation
 - [ ] Create user guide
 - [ ] Document configuration options
 - [ ] Add deployment guide
 
 ### Testing
+
 - [ ] Write unit tests
 - [ ] Implement integration tests
 - [ ] Add performance benchmarks
@@ -157,12 +177,14 @@
 ## Phase 9: Deployment & Operations
 
 ### Deployment
+
 - [ ] Create Docker images
 - [ ] Write Kubernetes manifests
 - [ ] Create Helm charts
 - [ ] Add CI/CD pipelines
 
 ### Operations
+
 - [ ] Create backup strategy
 - [ ] Implement disaster recovery
 - [ ] Add monitoring and alerting

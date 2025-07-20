@@ -18,7 +18,7 @@ const (
 // Metric represents a single metric
 type Metric struct {
 	Name        string                 `json:"name"`
-	Type        MetricType             `json:"type"`
+	Type        string                 `json:"type"`
 	Value       float64                `json:"value"`
 	Labels      map[string]string      `json:"labels,omitempty"`
 	Timestamp   time.Time              `json:"timestamp"`
@@ -127,7 +127,7 @@ func (m *MetricsCollector) GetMetrics() []Metric {
 		value := atomic.LoadInt64(counter)
 		metrics = append(metrics, Metric{
 			Name:        name,
-			Type:        MetricTypeCounter,
+			Type:        string(MetricTypeCounter),
 			Value:       float64(value),
 			Timestamp:   timestamp,
 			Description: m.descriptions[name],
@@ -138,7 +138,7 @@ func (m *MetricsCollector) GetMetrics() []Metric {
 	for name, gauge := range m.gauges {
 		metrics = append(metrics, Metric{
 			Name:        name,
-			Type:        MetricTypeGauge,
+			Type:        string(MetricTypeGauge),
 			Value:       *gauge,
 			Timestamp:   timestamp,
 			Description: m.descriptions[name],
@@ -151,7 +151,7 @@ func (m *MetricsCollector) GetMetrics() []Metric {
 		for statName, value := range stats {
 			metrics = append(metrics, Metric{
 				Name: name + "_" + statName,
-				Type: MetricTypeGauge,
+				Type: string(MetricTypeGauge),
 				Value: value,
 				Timestamp: timestamp,
 				Description: m.descriptions[name],
@@ -162,7 +162,7 @@ func (m *MetricsCollector) GetMetrics() []Metric {
 	// Add rate metrics
 	metrics = append(metrics, Metric{
 		Name:        "ingestion_rate_per_second",
-		Type:        MetricTypeGauge,
+		Type:        string(MetricTypeGauge),
 		Value:       m.ingestionRate.GetRate(),
 		Timestamp:   timestamp,
 		Description: "Log ingestion rate per second",
@@ -170,7 +170,7 @@ func (m *MetricsCollector) GetMetrics() []Metric {
 	
 	metrics = append(metrics, Metric{
 		Name:        "query_rate_per_second",
-		Type:        MetricTypeGauge,
+		Type:        string(MetricTypeGauge),
 		Value:       m.queryRate.GetRate(),
 		Timestamp:   timestamp,
 		Description: "Query execution rate per second",

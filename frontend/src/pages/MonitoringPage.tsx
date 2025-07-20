@@ -92,8 +92,17 @@ export const MonitoringPage: React.FC = () => {
 
   const fetchMonitoringData = async () => {
     try {
+      // Handle health endpoint (may return 503 when degraded, but still has data)
+      const healthPromise = api.get<SystemHealth>('/monitoring/health').catch(error => {
+        if (error.response?.status === 503) {
+          // 503 still contains valid health data
+          return error.response;
+        }
+        throw error;
+      });
+      
       const [healthRes, metricsRes, alertsRes] = await Promise.all([
-        api.get<SystemHealth>('/monitoring/health'),
+        healthPromise,
         api.get<{ metrics: Metric[] }>('/monitoring/metrics'),
         api.get<{ alerts: Alert[] }>('/monitoring/alerts/active'),
       ]);

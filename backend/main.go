@@ -200,6 +200,10 @@ func main() {
 			r.Get("/alerts/active", api.GetActiveAlerts(alertManager))
 		})
 	})
+	
+	// Prometheus metrics endpoint (outside /api/v1 for standard scraping)
+	prometheusExporter := monitoring.NewPrometheusExporter(metrics)
+	r.Get("/metrics", api.PrometheusMetrics(prometheusExporter))
 
 	// Start server
 	srv := &http.Server{
