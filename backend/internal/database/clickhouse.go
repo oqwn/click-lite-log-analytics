@@ -147,6 +147,26 @@ func (db *DB) exec(query string) error {
 	return nil
 }
 
+// Execute executes a query without returning results (for DDL statements)
+func (db *DB) Execute(ctx context.Context, query string) error {
+	return db.exec(query)
+}
+
+// Query executes a query and returns results
+func (db *DB) Query(ctx context.Context, queryStr string) ([]map[string]interface{}, error) {
+	// Create a simple query request and execute through the engine
+	req := &query.QueryRequest{
+		Query: queryStr,
+	}
+	
+	response, err := db.queryEngine.Execute(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	
+	return response.Rows, nil
+}
+
 func (db *DB) InsertLog(ctx context.Context, logEntry *models.Log) error {
 	// Convert attributes to JSON format for ClickHouse
 	attrs := make(map[string]string)

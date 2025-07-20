@@ -10,6 +10,7 @@ import { LogStreamEnhanced } from './components/LogStream/LogStreamEnhanced';
 import { MonitoringPage } from './pages/MonitoringPage';
 import { TracePage } from './pages/TracePage';
 import { ErrorDashboard } from './pages/ErrorDashboard';
+import PerformancePage from './pages/PerformancePage';
 
 const theme = createTheme({
   palette: {
@@ -50,6 +51,7 @@ function App() {
               <Route path="monitoring" element={<MonitoringPage />} />
               <Route path="traces" element={<TracePage />} />
               <Route path="errors" element={<ErrorDashboard />} />
+              <Route path="performance" element={<PerformancePage />} />
             </Route>
           </Routes>
         </BrowserRouter>

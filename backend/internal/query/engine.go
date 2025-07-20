@@ -7,14 +7,20 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/your-username/click-lite-log-analytics/backend/internal/cache"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/optimization"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/pagination"
 )
 
 // Engine manages SQL query execution and optimization
 type Engine struct {
 	db         QueryExecutor
 	validator  *Validator
-	optimizer  *Optimizer
+	optimizer  *optimization.QueryOptimizer
 	queryStore *QueryStore
+	cache      *cache.QueryCache
+	paginator  *pagination.Paginator
 }
 
 // QueryExecutor interface for database operations
@@ -29,16 +35,31 @@ type QueryRequest struct {
 	Timeout    int                    `json:"timeout,omitempty"` // seconds
 	MaxRows    int                    `json:"max_rows,omitempty"`
 	Format     string                 `json:"format,omitempty"` // json, csv, tsv
+	UseCache   bool                   `json:"use_cache,omitempty"`
+	
+	// Pagination parameters
+	PageSize  int    `json:"page_size,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
+	SortBy    string `json:"sort_by,omitempty"`
+	SortOrder string `json:"sort_order,omitempty"`
 }
 
 // QueryResponse represents a SQL query response
 type QueryResponse struct {
-	Columns      []ColumnInfo           `json:"columns"`
-	Rows         []map[string]interface{} `json:"rows"`
-	RowCount     int                    `json:"row_count"`
-	ExecutionTime int64                  `json:"execution_time_ms"`
-	Query        string                 `json:"query"`
-	Error        string                 `json:"error,omitempty"`
+	Columns       []ColumnInfo             `json:"columns"`
+	Rows          []map[string]interface{} `json:"rows"`
+	RowCount      int                      `json:"row_count"`
+	ExecutionTime int64                    `json:"execution_time_ms"`
+	Query         string                   `json:"query"`
+	Error         string                   `json:"error,omitempty"`
+	
+	// Performance optimization info
+	CacheHit      bool                       `json:"cache_hit,omitempty"`
+	Optimizations []string                   `json:"optimizations,omitempty"`
+	QueryPlan     *optimization.QueryPlan    `json:"query_plan,omitempty"`
+	
+	// Pagination info
+	Pagination    *pagination.PageResponse   `json:"pagination,omitempty"`
 }
 
 // ColumnInfo represents column metadata
@@ -50,11 +71,17 @@ type ColumnInfo struct {
 
 // NewEngine creates a new query engine
 func NewEngine(db QueryExecutor) *Engine {
+	// Initialize caching system
+	memCache := cache.NewMemoryCache(1000) // 1000 items max
+	queryCache := cache.NewQueryCache(memCache, 10*time.Minute) // 10 min TTL
+	
 	return &Engine{
 		db:         db,
 		validator:  NewValidator(),
-		optimizer:  NewOptimizer(),
+		optimizer:  optimization.NewQueryOptimizer(),
 		queryStore: NewQueryStore(),
+		cache:      queryCache,
+		paginator:  pagination.NewPaginator(100, 1000), // default 100, max 1000
 	}
 }
 
@@ -74,6 +101,17 @@ func (e *Engine) Execute(ctx context.Context, req *QueryRequest) (*QueryResponse
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
 	defer cancel()
 
+	// Check cache first if enabled
+	if req.UseCache {
+		if cached, found := e.cache.GetQueryResult(req.Query, req.Parameters); found {
+			if cachedResponse, ok := cached.(*QueryResponse); ok {
+				cachedResponse.CacheHit = true
+				cachedResponse.ExecutionTime = time.Since(start).Milliseconds()
+				return cachedResponse, nil
+			}
+		}
+	}
+
 	// Validate query
 	if err := e.validator.Validate(req.Query); err != nil {
 		response.Error = fmt.Sprintf("validation error: %v", err)
@@ -88,10 +126,33 @@ func (e *Engine) Execute(ctx context.Context, req *QueryRequest) (*QueryResponse
 	}
 
 	// Optimize query
-	query = e.optimizer.Optimize(query)
+	queryPlan := e.optimizer.Optimize(query)
+	query = queryPlan.OptimizedQuery
+	response.QueryPlan = queryPlan
+	response.Optimizations = queryPlan.Optimizations
 
-	// Apply row limit
-	if req.MaxRows > 0 && !strings.Contains(strings.ToUpper(query), "LIMIT") {
+	// Handle pagination if requested
+	var pageReq pagination.PageRequest
+	if req.PageSize > 0 {
+		pageReq = pagination.PageRequest{
+			PageSize:  req.PageSize,
+			PageToken: req.PageToken,
+			SortBy:    req.SortBy,
+			SortOrder: req.SortOrder,
+		}
+		
+		if err := e.paginator.ValidateRequest(&pageReq); err != nil {
+			response.Error = fmt.Sprintf("pagination error: %v", err)
+			return response, err
+		}
+		
+		query, err = e.paginator.ApplyPagination(query, pageReq)
+		if err != nil {
+			response.Error = fmt.Sprintf("pagination error: %v", err)
+			return response, err
+		}
+	} else if req.MaxRows > 0 && !strings.Contains(strings.ToUpper(query), "LIMIT") {
+		// Apply row limit if no pagination
 		query = fmt.Sprintf("%s LIMIT %d", query, req.MaxRows)
 	}
 
@@ -100,6 +161,28 @@ func (e *Engine) Execute(ctx context.Context, req *QueryRequest) (*QueryResponse
 	if err != nil {
 		response.Error = fmt.Sprintf("execution error: %v", err)
 		return response, err
+	}
+
+	// Handle pagination response
+	if req.PageSize > 0 {
+		// Convert to interface slice for pagination
+		interfaceRows := make([]interface{}, len(rows))
+		for i, row := range rows {
+			interfaceRows[i] = row
+		}
+		
+		pageResponse := e.paginator.CreateResponse(interfaceRows, pageReq, int64(len(rows)))
+		response.Pagination = pageResponse
+		
+		// Update rows with paginated results
+		if paginatedRows, ok := pageResponse.Data.([]interface{}); ok {
+			rows = make([]map[string]interface{}, len(paginatedRows))
+			for i, row := range paginatedRows {
+				if mapRow, ok := row.(map[string]interface{}); ok {
+					rows[i] = mapRow
+				}
+			}
+		}
 	}
 
 	// Process results
@@ -119,6 +202,12 @@ func (e *Engine) Execute(ctx context.Context, req *QueryRequest) (*QueryResponse
 	}
 
 	response.ExecutionTime = time.Since(start).Milliseconds()
+	
+	// Cache the response if caching is enabled
+	if req.UseCache && response.Error == "" {
+		e.cache.SetQueryResult(req.Query, req.Parameters, response)
+	}
+
 	return response, nil
 }
 

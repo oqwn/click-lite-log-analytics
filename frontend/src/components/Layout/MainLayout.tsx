@@ -22,6 +22,7 @@ import {
   MonitorHeart,
   AccountTree,
   BugReport,
+  Speed,
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Monitoring', path: '/monitoring', icon: MonitorHeart },
   { name: 'Traces', path: '/traces', icon: AccountTree },
   { name: 'Error Dashboard', path: '/errors', icon: BugReport },
+  { name: 'Performance', path: '/performance', icon: Speed },
 ];
 
 export const MainLayout: React.FC = () => {

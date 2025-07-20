@@ -16,6 +16,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/your-username/click-lite-log-analytics/backend/internal/api"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/cache"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/cluster"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/dashboard"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
@@ -23,6 +25,8 @@ import (
 	"github.com/your-username/click-lite-log-analytics/backend/internal/export"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/ingestion"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/monitoring"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/optimization"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/storage"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/tracing"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
 )
@@ -83,6 +87,22 @@ func main() {
 	traceManager := tracing.NewTraceManager()
 	errorDetector := errors.NewErrorDetector()
 	exporter := export.NewExporter(db)
+	
+	// Initialize performance optimization components
+	queryOptimizer := optimization.NewQueryOptimizer()
+	memCache := cache.NewMemoryCache(1000)
+	statsCache := cache.NewStatsCache(memCache, 1000)
+	storageOptimizer := storage.NewStorageOptimizer(db, storage.DefaultOptimizationConfig())
+	
+	// Initialize cluster coordinator
+	clusterConfig := cluster.ClusterConfig{
+		ReplicationFactor:   2,
+		ShardCount:          16,
+		HealthCheckInterval: 30 * time.Second,
+		FailoverTimeout:     10 * time.Second,
+		LoadBalancingPolicy: "round_robin",
+	}
+	coordinator := cluster.NewCoordinator(clusterConfig)
 	
 	// Initialize log tailer
 	ctx, cancel := context.WithCancel(context.Background())
@@ -233,6 +253,33 @@ func main() {
 		r.Route("/export", func(r chi.Router) {
 			r.Post("/logs", exportHandler.ExportLogs)
 			r.Get("/formats", exportHandler.GetExportFormats)
+		})
+		
+		// Performance optimization endpoints
+		performanceHandler := api.NewPerformanceHandlerChi(queryOptimizer, storageOptimizer, coordinator, statsCache)
+		r.Route("/performance", func(r chi.Router) {
+			// Query optimization
+			r.Post("/optimize-query", performanceHandler.OptimizeQuery)
+			r.Post("/suggest-indexes", performanceHandler.SuggestIndexes)
+			r.Post("/benchmark-query", performanceHandler.BenchmarkQuery)
+
+			// Cache management
+			r.Get("/cache/stats", performanceHandler.GetCacheStats)
+			r.Delete("/cache", performanceHandler.ClearCache)
+
+			// Storage optimization
+			r.Post("/storage/analyze", performanceHandler.AnalyzeStorage)
+			r.Post("/storage/optimize", performanceHandler.OptimizeStorage)
+			r.Post("/storage/optimize-schema", performanceHandler.CreateOptimizedSchema)
+			r.Post("/storage/materialized-views", performanceHandler.CreateMaterializedViews)
+
+			// Cluster management
+			r.Get("/cluster/status", performanceHandler.GetClusterStatus)
+			r.Post("/cluster/nodes", performanceHandler.RegisterNode)
+			r.Delete("/cluster/nodes/{id}", performanceHandler.RemoveNode)
+
+			// Overall metrics
+			r.Get("/metrics", performanceHandler.GetPerformanceMetrics)
 		})
 	})
 	
