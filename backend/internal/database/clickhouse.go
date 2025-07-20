@@ -300,3 +300,11 @@ func (db *DB) GetQueryEngine() *query.Engine {
 func (db *DB) ExecuteQuery(ctx context.Context, req *query.QueryRequest) (*query.QueryResponse, error) {
 	return db.queryEngine.Execute(ctx, req)
 }
+
+// ExecuteSQL executes a raw SQL query and returns results
+func (db *DB) ExecuteSQL(sql string) ([]map[string]interface{}, error) {
+	ctx := context.Background()
+	// Use the query adapter directly
+	queryAdapter := NewQueryAdapter(db.baseURL, db.database)
+	return queryAdapter.ExecuteQuery(ctx, sql)
+}

@@ -19,8 +19,11 @@ import (
 	"github.com/your-username/click-lite-log-analytics/backend/internal/config"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/dashboard"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/database"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/errors"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/export"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/ingestion"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/monitoring"
+	"github.com/your-username/click-lite-log-analytics/backend/internal/tracing"
 	"github.com/your-username/click-lite-log-analytics/backend/internal/websocket"
 )
 
@@ -76,6 +79,11 @@ func main() {
 	alertManager := monitoring.NewAlertManager(metrics)
 	alertManager.AddListener(monitoring.NewLogAlertListener(log.Logger))
 	
+	// Initialize advanced features
+	traceManager := tracing.NewTraceManager()
+	errorDetector := errors.NewErrorDetector()
+	exporter := export.NewExporter(db)
+	
 	// Initialize log tailer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -99,6 +107,10 @@ func main() {
 	// Initialize batch processor for ingestion
 	batchProcessor := ingestion.NewBatchProcessor(db, 500, 5*time.Second)
 	defer batchProcessor.Stop()
+	
+	// Set up log processor with trace and error detection
+	logProcessor := ingestion.NewLogProcessor(traceManager, errorDetector)
+	batchProcessor.SetProcessor(logProcessor)
 
 	// Initialize ingestion handlers
 	httpHandler := ingestion.NewHTTPHandlerWithMetrics(batchProcessor, wsHub, metrics)
@@ -198,6 +210,29 @@ func main() {
 			r.Get("/metrics", api.GetMetrics(metrics))
 			r.Get("/alerts", api.GetAlerts(alertManager))
 			r.Get("/alerts/active", api.GetActiveAlerts(alertManager))
+		})
+		
+		// Trace correlation endpoints
+		traceHandler := api.NewTraceHandler(traceManager)
+		r.Route("/traces", func(r chi.Router) {
+			r.Get("/", traceHandler.GetTraces)
+			r.Get("/{traceID}", traceHandler.GetTrace)
+			r.Get("/{traceID}/timeline", traceHandler.GetTraceTimeline)
+		})
+		
+		// Error detection endpoints
+		errorHandler := api.NewErrorHandler(errorDetector)
+		r.Route("/errors", func(r chi.Router) {
+			r.Get("/stats", errorHandler.GetErrorStats)
+			r.Get("/anomalies", errorHandler.GetErrorAnomalies)
+			r.Get("/trends", errorHandler.GetErrorTrends)
+		})
+		
+		// Export endpoints
+		exportHandler := api.NewExportHandler(exporter)
+		r.Route("/export", func(r chi.Router) {
+			r.Post("/logs", exportHandler.ExportLogs)
+			r.Get("/formats", exportHandler.GetExportFormats)
 		})
 	})
 	

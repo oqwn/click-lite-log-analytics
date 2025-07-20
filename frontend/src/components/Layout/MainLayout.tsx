@@ -20,6 +20,8 @@ import {
   Menu as MenuIcon,
   Home,
   MonitorHeart,
+  AccountTree,
+  BugReport,
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 
@@ -31,6 +33,8 @@ const navigation = [
   { name: 'Query Builder', path: '/query-builder', icon: Search },
   { name: 'Dashboards', path: '/dashboards', icon: DashboardIcon },
   { name: 'Monitoring', path: '/monitoring', icon: MonitorHeart },
+  { name: 'Traces', path: '/traces', icon: AccountTree },
+  { name: 'Error Dashboard', path: '/errors', icon: BugReport },
 ];
 
 export const MainLayout: React.FC = () => {

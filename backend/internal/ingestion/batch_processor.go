@@ -20,6 +20,7 @@ type BatchProcessor struct {
 	flushChan    chan struct{}
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
+	processor    *LogProcessor
 }
 
 // NewBatchProcessor creates a new batch processor
@@ -39,8 +40,18 @@ func NewBatchProcessor(db *database.DB, batchSize int, flushInterval time.Durati
 	return bp
 }
 
+// SetProcessor sets the log processor
+func (bp *BatchProcessor) SetProcessor(processor *LogProcessor) {
+	bp.processor = processor
+}
+
 // Add adds a log to the batch
 func (bp *BatchProcessor) Add(log models.Log) {
+	// Process log through analyzers
+	if bp.processor != nil {
+		bp.processor.ProcessLog(&log)
+	}
+	
 	bp.bufferMu.Lock()
 	bp.buffer = append(bp.buffer, log)
 	shouldFlush := len(bp.buffer) >= bp.batchSize
