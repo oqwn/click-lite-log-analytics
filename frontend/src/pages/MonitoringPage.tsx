@@ -12,7 +12,6 @@ import {
   Alert,
   AlertTitle,
   IconButton,
-  Tooltip,
   Tab,
   Tabs,
   List,
@@ -32,33 +31,8 @@ import {
   TrendingUp,
   TrendingDown,
   QueryStats,
-  DataUsage,
 } from '@mui/icons-material';
-import { Line, Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip as ChartTooltip,
-  Legend,
-  ChartOptions,
-} from 'chart.js';
 import { api } from '../services/api';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  ChartTooltip,
-  Legend
-);
 
 interface HealthComponent {
   name: string;
@@ -115,7 +89,6 @@ export const MonitoringPage: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
   const fetchMonitoringData = async () => {
     try {
@@ -138,7 +111,6 @@ export const MonitoringPage: React.FC = () => {
   useEffect(() => {
     fetchMonitoringData();
     const interval = setInterval(fetchMonitoringData, 5000); // Refresh every 5 seconds
-    setRefreshInterval(interval);
 
     return () => {
       if (interval) clearInterval(interval);
