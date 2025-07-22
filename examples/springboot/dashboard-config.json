@@ -1,0 +1,191 @@
+{
+  "name": "Spring Boot Monitoring Dashboard",
+  "description": "Comprehensive monitoring dashboard for Spring Boot application on port 20005",
+  "widgets": [
+    {
+      "id": "health-status",
+      "type": "metric",
+      "title": "Health Status",
+      "position": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "query": {
+        "select": ["COUNT(*) as healthy_checks"],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'health_check'",
+          "attributes['health_status'] = 'UP'",
+          "timestamp >= now() - INTERVAL 5 MINUTE"
+        ]
+      },
+      "config": {
+        "value_label": "Healthy",
+        "color": "success"
+      }
+    },
+    {
+      "id": "memory-usage",
+      "type": "chart",
+      "title": "Memory Usage %",
+      "position": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "query": {
+        "select": [
+          "toStartOfMinute(timestamp) as time",
+          "AVG(toFloat64(attributes['memory_usage_percent'])) as memory_percent"
+        ],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'system'",
+          "timestamp >= now() - INTERVAL 1 HOUR"
+        ],
+        "group_by": ["time"],
+        "order_by": ["time"]
+      },
+      "config": {
+        "chart_type": "line",
+        "x_axis": "time",
+        "y_axis": "memory_percent",
+        "color": "warning"
+      }
+    },
+    {
+      "id": "request-count",
+      "type": "metric",
+      "title": "Total Requests (Last Hour)",
+      "position": { "x": 0, "y": 4, "w": 4, "h": 3 },
+      "query": {
+        "select": ["MAX(toInt64(attributes['request_count'])) as total_requests"],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'performance'",
+          "timestamp >= now() - INTERVAL 1 HOUR"
+        ]
+      },
+      "config": {
+        "value_label": "Requests",
+        "color": "primary"
+      }
+    },
+    {
+      "id": "error-rate",
+      "type": "metric",
+      "title": "Error Rate %",
+      "position": { "x": 4, "y": 4, "w": 4, "h": 3 },
+      "query": {
+        "select": ["AVG(toFloat64(attributes['error_rate']) * 100) as avg_error_rate"],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'performance'",
+          "timestamp >= now() - INTERVAL 1 HOUR"
+        ]
+      },
+      "config": {
+        "value_label": "Error %",
+        "color": "error",
+        "precision": 2
+      }
+    },
+    {
+      "id": "avg-response-time",
+      "type": "metric",
+      "title": "Avg Response Time",
+      "position": { "x": 8, "y": 4, "w": 4, "h": 3 },
+      "query": {
+        "select": ["AVG(toFloat64(attributes['avg_response_time_ms'])) as avg_response_ms"],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'performance'",
+          "timestamp >= now() - INTERVAL 1 HOUR",
+          "attributes['avg_response_time_ms'] != ''"
+        ]
+      },
+      "config": {
+        "value_label": "ms",
+        "color": "info",
+        "precision": 1
+      }
+    },
+    {
+      "id": "request-timeline",
+      "type": "chart",
+      "title": "Request Timeline",
+      "position": { "x": 0, "y": 7, "w": 12, "h": 5 },
+      "query": {
+        "select": [
+          "toStartOfMinute(timestamp) as time",
+          "COUNT(*) as log_count"
+        ],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "message LIKE '%Request completed%'",
+          "timestamp >= now() - INTERVAL 2 HOUR"
+        ],
+        "group_by": ["time"],
+        "order_by": ["time"]
+      },
+      "config": {
+        "chart_type": "bar",
+        "x_axis": "time",
+        "y_axis": "log_count",
+        "color": "primary"
+      }
+    },
+    {
+      "id": "recent-errors",
+      "type": "table",
+      "title": "Recent Errors",
+      "position": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "query": {
+        "select": [
+          "timestamp",
+          "level",
+          "message",
+          "attributes['exception'] as exception",
+          "attributes['exception_message'] as error_message"
+        ],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "level IN ('ERROR', 'WARN')",
+          "timestamp >= now() - INTERVAL 6 HOUR"
+        ],
+        "order_by": ["timestamp DESC"],
+        "limit": 50
+      },
+      "config": {
+        "columns": ["timestamp", "level", "message", "exception", "error_message"]
+      }
+    },
+    {
+      "id": "system-metrics",
+      "type": "table",
+      "title": "Latest System Metrics",
+      "position": { "x": 0, "y": 18, "w": 12, "h": 4 },
+      "query": {
+        "select": [
+          "timestamp",
+          "attributes['max_memory_bytes'] as max_memory_mb",
+          "attributes['used_memory_bytes'] as used_memory_mb",
+          "attributes['memory_usage_percent'] as memory_percent",
+          "attributes['available_processors'] as cpu_cores"
+        ],
+        "from": "logs",
+        "where": [
+          "service = 'spring-boot-app'",
+          "attributes['metric_type'] = 'system'"
+        ],
+        "order_by": ["timestamp DESC"],
+        "limit": 10
+      },
+      "config": {
+        "columns": ["timestamp", "max_memory_mb", "used_memory_mb", "memory_percent", "cpu_cores"]
+      }
+    }
+  ],
+  "refresh_interval": 30,
+  "auto_refresh": true
+}
