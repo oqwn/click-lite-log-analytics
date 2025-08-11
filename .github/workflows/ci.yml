@@ -130,7 +130,7 @@ jobs:
           CLICKHOUSE_PORT: 9000
           
       - name: Upload Go coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./backend/coverage.out
           flags: backend
@@ -158,7 +158,7 @@ jobs:
         run: pnpm test -- --coverage --watchAll=false
         
       - name: Upload frontend coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./frontend/coverage/lcov.info
           flags: frontend
